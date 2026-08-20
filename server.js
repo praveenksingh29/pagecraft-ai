@@ -487,15 +487,78 @@ Precision rules:
   throw lastErr || new Error("Compound search failed.");
 }
 
+// Second live-search option: Gemini's built-in Google Search grounding. This
+// is a completely separate provider and quota from Groq, so when Groq's
+// compound model is rate-limited (its free-tier budget is shared with the
+// extraction calls and is easy to exhaust), this gives a real second chance
+// at a live, cited answer instead of failing outright.
+async function searchWebWithGemini(query) {
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not configured on the server (.env).");
+  }
+
+  const models = ["gemini-flash-latest", "gemini-3.5-flash"];
+  let lastErr = null;
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [{
+              text: `Search the web and answer with concrete, factual findings — specific numbers, names, dates, locations, and funding figures where available. If the question names a company by a website domain, only report facts about that exact company (a same-named but unrelated company at a different domain is not it). Skip anything you can't find rather than guessing.\n\nQuery: ${query}`
+            }]
+          }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.1 }
+        })
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        lastErr = new Error(errBody.error?.message || `Gemini search ${model} HTTP ${res.status}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim();
+      if (!text) {
+        lastErr = new Error("Gemini search returned no text.");
+        continue;
+      }
+
+      const sources = (data.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+        .map((c) => c.web?.uri)
+        .filter(Boolean)
+        .slice(0, 5);
+
+      return sources.length ? `${text}\n\nSources:\n${sources.join("\n")}` : text;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error("Gemini search failed.");
+}
+
 app.get("/api/search", async (req, res) => {
   const q = req.query.q;
   if (!q) return res.status(400).json({ error: "Missing 'q' query parameter." });
 
   try {
     const text = await searchWebWithCompound(q);
-    res.json({ text });
-  } catch (err) {
-    res.status(502).json({ error: err.message || "Web search request failed." });
+    return res.json({ text, provider: "Groq Compound" });
+  } catch (eCompound) {
+    try {
+      const text = await searchWebWithGemini(q);
+      return res.json({ text, provider: "Gemini Search" });
+    } catch (eGemini) {
+      return res.status(502).json({ error: eCompound.message || eGemini.message || "Web search request failed." });
+    }
   }
 });
 
