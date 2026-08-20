@@ -1975,6 +1975,25 @@ async function uploadPdfAndGetLink(base64, filename) {
 }
 
 // Renders the given canvas-shaped data onto the real #onePagerCanvas and
+// Waits for every <img> inside a container to finish loading (or fail) before
+// resolving, so html2canvas never captures a page with images mid-fetch.
+// Caps the wait so one slow/broken image can't hang the whole batch forever.
+function waitForImagesToLoad(container, timeoutMs = 4000) {
+  const imgs = Array.from(container.querySelectorAll("img"));
+  if (imgs.length === 0) return Promise.resolve();
+
+  const loadPromises = imgs.map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise((resolve) => {
+      img.addEventListener("load", resolve, { once: true });
+      img.addEventListener("error", resolve, { once: true });
+    });
+  });
+
+  const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs));
+  return Promise.race([Promise.all(loadPromises), timeout]);
+}
+
 // captures it as a one-page PDF, returned as base64 — reuses the exact same
 // html2canvas/jsPDF pipeline as the single-agent Export button, just
 // returning bytes instead of downloading.
@@ -2091,7 +2110,15 @@ async function sendSelectedForReview() {
     try {
       currentStartupData = bulkItemToStartupData(item);
       updateCanvasUI();
-      await new Promise((r) => setTimeout(r, 60)); // let layout/paint settle before capture
+
+      // Let the browser actually paint the new content (two animation frames),
+      // then wait for every logo/photo in the canvas to finish loading before
+      // capturing — otherwise html2canvas grabs a still-blank page and the
+      // resulting PDF opens white.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const canvasEl = document.getElementById("onePagerCanvas");
+      if (canvasEl) await waitForImagesToLoad(canvasEl);
+      await new Promise((r) => setTimeout(r, 300)); // clear any CSS transitions
 
       const pdfBase64 = await generateOnePagerPdfBase64();
       const missing = getMissingFieldLabels(item);
