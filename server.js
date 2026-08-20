@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "";
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || "";
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY || "";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -545,19 +546,71 @@ async function searchWebWithGemini(query) {
   throw lastErr || new Error("Gemini search failed.");
 }
 
+// Primary live-search option: Tavily, a search API purpose-built for AI
+// agents. It has its own independent free quota (not shared with Groq or
+// Gemini), returns a direct synthesized answer plus real cited sources, and
+// has proven far more reliable than either AI provider's built-in search.
+async function searchWebWithTavily(query) {
+  if (!TAVILY_API_KEY) {
+    throw new Error("TAVILY_API_KEY is not configured on the server (.env).");
+  }
+
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: TAVILY_API_KEY,
+      query,
+      search_depth: "advanced",
+      include_answer: true,
+      max_results: 3
+    })
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || errBody.detail || `Tavily search HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const parts = [];
+  // Tavily's own "answer" already resolves cross-source conflicts (and
+  // same-named-but-different-company mixups) on its end — it's far more
+  // reliable than the raw result snippets below, so it needs to be clearly
+  // marked as the one to trust when the two disagree.
+  if (data.answer) {
+    parts.push(`VERIFIED ANSWER (trust this over anything in "Supporting context" below): ${data.answer}`);
+  }
+  const supporting = (data.results || []).slice(0, 3)
+    .map((r) => `- ${r.url}\n  ${(r.content || "").slice(0, 300)}`)
+    .join("\n");
+  if (supporting) {
+    parts.push(`Supporting context (may include unrelated companies that share the same name — only trust details that match the Verified Answer above):\n${supporting}`);
+  }
+
+  const text = parts.join("\n\n").trim();
+  if (!text) throw new Error("Tavily search returned no results.");
+  return text;
+}
+
 app.get("/api/search", async (req, res) => {
   const q = req.query.q;
   if (!q) return res.status(400).json({ error: "Missing 'q' query parameter." });
 
   try {
-    const text = await searchWebWithCompound(q);
-    return res.json({ text, provider: "Groq Compound" });
-  } catch (eCompound) {
+    const text = await searchWebWithTavily(q);
+    return res.json({ text, provider: "Tavily Search" });
+  } catch (eTavily) {
     try {
-      const text = await searchWebWithGemini(q);
-      return res.json({ text, provider: "Gemini Search" });
-    } catch (eGemini) {
-      return res.status(502).json({ error: eCompound.message || eGemini.message || "Web search request failed." });
+      const text = await searchWebWithCompound(q);
+      return res.json({ text, provider: "Groq Compound" });
+    } catch (eCompound) {
+      try {
+        const text = await searchWebWithGemini(q);
+        return res.json({ text, provider: "Gemini Search" });
+      } catch (eGemini) {
+        return res.status(502).json({ error: eTavily.message || eCompound.message || eGemini.message || "Web search request failed." });
+      }
     }
   }
 });

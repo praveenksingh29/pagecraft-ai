@@ -1005,7 +1005,8 @@ Only include a key if the source actually states or clearly implies that value. 
   ]
 }
 For "foundingTeam": include EVERY person shown on any "team"/"leadership"/"founders" page, not only people whose title literally contains the word "founder". If a page/section lists several people under a "team"/"leadership" heading, all of them belong in this array with their exact stated titles.
-CRITICAL: Do NOT include people from customer testimonials, reviews, quotes, or case studies — those people work at a DIFFERENT company (this is usually obvious because their own company's name is stated right next to their title, e.g. "Founder, Livstations" or "— Jane Doe, CEO of AcmeCorp"). Only include people who are clearly part of THIS startup's own team.`;
+CRITICAL: Do NOT include people from customer testimonials, reviews, quotes, or case studies — those people work at a DIFFERENT company (this is usually obvious because their own company's name is stated right next to their title, e.g. "Founder, Livstations" or "— Jane Doe, CEO of AcmeCorp"). Only include people who are clearly part of THIS startup's own team.
+CRITICAL: Company names collide constantly — search results often mix in a completely different company that happens to share the same name (different domain, different country, different industry). If the source text names a specific website/domain for the startup, only use facts clearly tied to that exact domain/company, and ignore any result belonging to a same-named but unrelated business.`;
 }
 
 // Applies whatever the AI genuinely found to currentStartupData.
@@ -2084,7 +2085,7 @@ function renderExtractionPreviewBlock(parsedJSON, extractionId) {
 // (homepage + common about/team subpages) plus a general web search for the
 // company name, then fills in ONLY the canvas fields that are still blank —
 // data already on the canvas (e.g. from a PDF upload) is never overwritten.
-async function handleWebsiteResearchInChat(url, feed, loaderId) {
+async function handleWebsiteResearchInChat(url, userMessage, feed, loaderId) {
   const loader = document.getElementById(loaderId);
   const loaderLabel = loader?.querySelector("span:last-child");
   if (loaderLabel) loaderLabel.textContent = `Fetching ${url} and researching online...`;
@@ -2106,9 +2107,16 @@ async function handleWebsiteResearchInChat(url, feed, loaderId) {
   // names collide constantly (there's more than one "Enlog" on the internet,
   // for instance), and searching by name alone risks pulling in a totally
   // unrelated company's facts.
-  const companyQuery = isMeaningfulExtractedValue(currentStartupData.name)
+  const companyLabel = isMeaningfulExtractedValue(currentStartupData.name)
     ? `${currentStartupData.name} (${hostname})`
     : hostname;
+
+  // What the user actually asked ("...check headquarters and team size")
+  // has to be part of the search query itself — searching on just the
+  // company name returns a generic "about this company" blurb, not the
+  // specific fact being asked for.
+  const askedQuestion = userMessage.replace(url, "").trim();
+  const companyQuery = askedQuestion ? `${companyLabel} — ${askedQuestion}` : companyLabel;
 
   let searchContext = "";
   try {
@@ -2121,9 +2129,13 @@ async function handleWebsiteResearchInChat(url, feed, loaderId) {
   // scrape eats the whole prompt budget and the web search results (often
   // where headquarters/team size actually live, e.g. LinkedIn/Crunchbase)
   // get truncated away entirely.
+  // Search results go first — they carry a verified, disambiguated answer
+  // for facts like headquarters/team size — with the website's own text
+  // after as secondary context (its marketing/testimonial copy can be
+  // vague or, for facts like location, actively misleading).
   const combinedText = [
-    fetchData.text ? `=== WEBSITE CONTENT (${url}) ===\n${fetchData.text.slice(0, 9000)}` : "",
-    searchContext ? `=== WEB SEARCH RESULTS FOR "${companyQuery}" ===\n${searchContext.slice(0, 6000)}` : ""
+    searchContext ? `=== WEB SEARCH RESULTS FOR "${companyQuery}" ===\n${searchContext.slice(0, 6000)}` : "",
+    fetchData.text ? `=== WEBSITE CONTENT (${url}) ===\n${fetchData.text.slice(0, 9000)}` : ""
   ].filter(Boolean).join("\n\n");
 
   const loaderEl = document.getElementById(loaderId);
@@ -2273,7 +2285,7 @@ async function sendAIAssistantMessage() {
     const detectedUrl = extractFirstUrl(promptText);
 
     if (detectedUrl) {
-      await handleWebsiteResearchInChat(detectedUrl, feed, loaderId);
+      await handleWebsiteResearchInChat(detectedUrl, promptText, feed, loaderId);
     } else {
       let searchContext = "";
       try {
