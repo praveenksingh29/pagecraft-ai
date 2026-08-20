@@ -615,6 +615,54 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
+// Temporary in-memory storage for generated one-pager PDFs, so a review
+// email can include a real download link instead of a true email
+// attachment (EmailJS's attachment feature is a paid add-on; this needs no
+// account upgrade and no third-party file host). Entries expire after 48
+// hours so memory usage doesn't grow unbounded on a long-running instance.
+const generatedPdfStore = new Map();
+const PDF_TTL_MS = 48 * 60 * 60 * 1000;
+
+function cleanupExpiredPdfs() {
+  const now = Date.now();
+  for (const [id, entry] of generatedPdfStore.entries()) {
+    if (now - entry.createdAt > PDF_TTL_MS) generatedPdfStore.delete(id);
+  }
+}
+
+app.post("/api/store-pdf", (req, res) => {
+  const { base64, filename } = req.body || {};
+  if (!base64) return res.status(400).json({ error: "Missing 'base64' in request body." });
+
+  cleanupExpiredPdfs();
+
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, "base64");
+  } catch {
+    return res.status(400).json({ error: "Invalid base64 content." });
+  }
+  if (buffer.length === 0) return res.status(400).json({ error: "Empty PDF content." });
+
+  const id = require("crypto").randomBytes(12).toString("hex");
+  generatedPdfStore.set(id, {
+    buffer,
+    filename: (filename || "OnePager.pdf").replace(/[^a-zA-Z0-9._-]/g, "_"),
+    createdAt: Date.now()
+  });
+
+  res.json({ url: `/api/pdf/${id}` });
+});
+
+app.get("/api/pdf/:id", (req, res) => {
+  const entry = generatedPdfStore.get(req.params.id);
+  if (!entry) return res.status(404).send("This link has expired or does not exist.");
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${entry.filename}"`);
+  res.send(entry.buffer);
+});
+
 // Single-page app fallback (keeps deep-link-style reloads working)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));

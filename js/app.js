@@ -11,8 +11,46 @@ if (window.emailjs && typeof emailjs.init === "function") {
 let currentStartupData = JSON.parse(JSON.stringify(DEFAULT_STARTUP));
 let currentTemplateId = "exec-grid";
 let currentView = "dashboard";
-let bulkStartupsList = JSON.parse(JSON.stringify(SAMPLE_BULK_STARTUPS));
+// Bulk items use the SAME field names/shape as currentStartupData (plus a
+// few bulk-only fields: id/status/reviewerEmail) so a bulk row can be
+// dropped straight into the editable canvas or a PDF export with zero
+// translation. The built-in sample data predates this shape, so it's
+// adapted once at load time.
+function sampleStartupToBulkItem(s, idx) {
+  return {
+    id: s.id || `sample-${idx}`,
+    status: s.status || "Draft",
+    reviewerEmail: s.reviewerEmail || "",
+    name: s.name || "",
+    tagline: s.description || "",
+    climateSector: s.sector || "",
+    subSector: "",
+    stage: s.stage || "",
+    marketSize: "",
+    totalFundRaised: "",
+    revenueLast12Months: s.currentTraction || "",
+    countries: "",
+    co2EmissionReduced: s.climateMetrics || "",
+    avgEnergySavings: "",
+    waterSaved: "",
+    uspAIUse: s.description || "",
+    targetCustomer: "",
+    businessModel: "",
+    teamSize: "",
+    currentAsk: s.currentAsk || "",
+    incorporateYear: "",
+    headquaters: s.location || "",
+    website: "",
+    logo: s.logo || "",
+    foundingTeam: [],
+    strategicPartners: [],
+    backedBy: []
+  };
+}
+
+let bulkStartupsList = SAMPLE_BULK_STARTUPS.map((s, idx) => sampleStartupToBulkItem(s, idx));
 let currentBulkLayout = "grid";
+let selectedBulkIds = new Set();
 let notificationFeed = JSON.parse(JSON.stringify(INITIAL_NOTIFICATIONS));
 let replyThreadsData = JSON.parse(JSON.stringify(INITIAL_REPLY_THREADS));
 let isUserAuthenticated = true; // Workspace opens directly on first load for instant access
@@ -1412,9 +1450,41 @@ function switchBulkLayout(layout) {
 
 function bulkStatusBadgeClass(status) {
   if (status === "Ready") return "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
-  if (status === "Generating") return "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 animate-pulse";
+  if (status === "Sent") return "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30";
+  if (status === "Generating" || status === "Sending") return "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 animate-pulse";
   if (status === "Error") return "bg-rose-500/20 text-rose-300 border border-rose-500/30";
   return "bg-amber-500/20 text-amber-300 border border-amber-500/30";
+}
+
+function toggleBulkSelection(id, checked) {
+  if (checked) selectedBulkIds.add(id);
+  else selectedBulkIds.delete(id);
+  updateBulkSelectionUI();
+}
+
+function toggleSelectAllBulk(checked) {
+  selectedBulkIds = checked ? new Set(bulkStartupsList.map((i) => i.id)) : new Set();
+  renderBulkGallery(currentBulkLayout);
+}
+
+function updateBulkSelectionUI() {
+  const sendBtn = document.getElementById("bulkSendSelectedBtn");
+  const countEl = document.getElementById("bulkSelectedCount");
+  const selectAllBox = document.getElementById("bulkSelectAllCheckbox");
+
+  if (sendBtn) sendBtn.disabled = selectedBulkIds.size === 0;
+  if (countEl) countEl.innerText = selectedBulkIds.size;
+  if (selectAllBox) {
+    selectAllBox.checked = bulkStartupsList.length > 0 && selectedBulkIds.size === bulkStartupsList.length;
+    selectAllBox.indeterminate = selectedBulkIds.size > 0 && selectedBulkIds.size < bulkStartupsList.length;
+  }
+}
+
+function bulkCardCheckbox(item) {
+  const checked = selectedBulkIds.has(item.id) ? "checked" : "";
+  return `<label class="absolute top-3 left-3 z-10 w-6 h-6 rounded-md bg-black/50 backdrop-blur flex items-center justify-center cursor-pointer border border-white/20" onclick="event.stopPropagation()">
+    <input type="checkbox" ${checked} onchange="toggleBulkSelection('${item.id}', this.checked)" class="w-4 h-4 accent-indigo-500 cursor-pointer">
+  </label>`;
 }
 
 function renderBulkGallery(layout) {
@@ -1424,36 +1494,37 @@ function renderBulkGallery(layout) {
   if (layout === "grid") {
     container.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
     container.innerHTML = bulkStartupsList.map(item => `
-      <div class="glass-card p-5 rounded-2xl border border-white/10 flex flex-col justify-between hover:border-indigo-500/40 transition-all">
+      <div class="relative glass-card p-5 rounded-2xl border border-white/10 flex flex-col justify-between hover:border-indigo-500/40 transition-all">
+        ${bulkCardCheckbox(item)}
         <div>
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between mb-3 pl-7">
             <img src="${item.logo}" class="w-10 h-10 rounded-lg object-cover border border-white/10">
             <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${bulkStatusBadgeClass(item.status)}">
               ${item.status}
             </span>
           </div>
-          <h3 class="text-base font-bold text-white font-['Outfit']">${item.name}</h3>
-          <span class="text-xs text-indigo-400 font-medium block">${item.sector} • ${item.stage}</span>
-          <p class="text-xs text-gray-400 mt-2 line-clamp-2">${item.description}</p>
-          
+          <h3 class="text-base font-bold text-white font-['Outfit']">${item.name || "Untitled Startup"}</h3>
+          <span class="text-xs text-indigo-400 font-medium block">${item.climateSector || "—"} • ${item.stage || "—"}</span>
+          <p class="text-xs text-gray-400 mt-2 line-clamp-2">${item.tagline || item.uspAIUse || ""}</p>
+
           <div class="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span class="text-[10px] text-gray-500 block">Traction</span>
-              <span class="text-white font-semibold text-[11px]">${item.currentTraction}</span>
+              <span class="text-[10px] text-gray-500 block">Revenue / Traction</span>
+              <span class="text-white font-semibold text-[11px] truncate block">${item.revenueLast12Months || "—"}</span>
             </div>
             <div>
               <span class="text-[10px] text-gray-500 block">Funding Ask</span>
-              <span class="text-indigo-300 font-semibold text-[11px]">${item.currentAsk}</span>
+              <span class="text-indigo-300 font-semibold text-[11px] truncate block">${item.currentAsk || "—"}</span>
             </div>
           </div>
         </div>
 
         <div class="mt-5 pt-3 border-t border-white/10 flex items-center justify-between space-x-2">
-          <button onclick="loadBulkIntoCanvas('${item.id}')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-200 flex items-center space-x-1">
+          <button onclick="openBulkEditModal('${item.id}')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-200 flex items-center space-x-1">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 text-indigo-400"></i>
-            <span>Edit Canvas</span>
+            <span>Edit</span>
           </button>
-          <button onclick="openReviewModalForBulk('${item.name}', '${item.reviewerEmail}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center space-x-1">
+          <button onclick="openReviewModalForBulk('${item.id}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center space-x-1">
             <i data-lucide="send" class="w-3.5 h-3.5"></i>
             <span>Review</span>
           </button>
@@ -1463,57 +1534,62 @@ function renderBulkGallery(layout) {
   } else if (layout === "list") {
     container.className = "space-y-3 w-full";
     container.innerHTML = bulkStartupsList.map(item => `
-      <div class="glass-card p-4 rounded-xl border border-white/10 flex items-center justify-between">
+      <div class="relative glass-card p-4 pl-14 rounded-xl border border-white/10 flex items-center justify-between">
+        ${bulkCardCheckbox(item)}
         <div class="flex items-center space-x-4">
           <img src="${item.logo}" class="w-10 h-10 rounded-lg object-cover border border-white/10">
           <div>
-            <h3 class="text-sm font-bold text-white">${item.name}</h3>
-            <span class="text-xs text-gray-400">${item.sector} | ${item.stage} | ${item.location}</span>
+            <h3 class="text-sm font-bold text-white">${item.name || "Untitled Startup"}</h3>
+            <span class="text-xs text-gray-400">${item.climateSector || "—"} | ${item.stage || "—"} | ${item.headquaters || "—"}</span>
           </div>
         </div>
         <div class="hidden md:flex items-center space-x-6 text-xs">
           <div>
-            <span class="text-gray-500 text-[10px] block">Traction</span>
-            <span class="text-white font-medium">${item.currentTraction}</span>
+            <span class="text-gray-500 text-[10px] block">Revenue</span>
+            <span class="text-white font-medium">${item.revenueLast12Months || "—"}</span>
           </div>
           <div>
             <span class="text-gray-500 text-[10px] block">Ask</span>
-            <span class="text-indigo-400 font-medium">${item.currentAsk}</span>
+            <span class="text-indigo-400 font-medium">${item.currentAsk || "—"}</span>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <button onclick="loadBulkIntoCanvas('${item.id}')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-200">Canvas</button>
-          <button onclick="openReviewModalForBulk('${item.name}', '${item.reviewerEmail}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs">Review</button>
+          <button onclick="openBulkEditModal('${item.id}')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-200">Edit</button>
+          <button onclick="openReviewModalForBulk('${item.id}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs">Review</button>
         </div>
       </div>
     `).join("");
   } else if (layout === "carousel") {
     container.className = "flex space-x-6 overflow-x-auto pb-4";
     container.innerHTML = bulkStartupsList.map(item => `
-      <div class="glass-card p-5 rounded-2xl border border-white/10 min-w-[300px] flex flex-col justify-between">
+      <div class="relative glass-card p-5 rounded-2xl border border-white/10 min-w-[300px] flex flex-col justify-between">
+        ${bulkCardCheckbox(item)}
         <div>
           <img src="${item.logo}" class="w-12 h-12 rounded-lg object-cover mb-3">
-          <h3 class="text-base font-bold text-white">${item.name}</h3>
-          <span class="text-xs text-indigo-400">${item.sector}</span>
-          <p class="text-xs text-gray-400 mt-2">${item.description}</p>
+          <h3 class="text-base font-bold text-white">${item.name || "Untitled Startup"}</h3>
+          <span class="text-xs text-indigo-400">${item.climateSector || "—"}</span>
+          <p class="text-xs text-gray-400 mt-2">${item.tagline || item.uspAIUse || ""}</p>
         </div>
-        <button onclick="loadBulkIntoCanvas('${item.id}')" class="mt-4 w-full py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">Edit One-Pager</button>
+        <button onclick="openBulkEditModal('${item.id}')" class="mt-4 w-full py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">Edit One-Pager</button>
       </div>
     `).join("");
   }
 
+  updateBulkSelectionUI();
   lucide.createIcons();
 }
 
 // Asks the AI to turn one bulk row's raw facts into proper one-pager copy.
+// Only fills gaps — a row that already came in with rich data (e.g. from the
+// full startup spreadsheet) keeps what it has rather than being overwritten.
 async function generateBulkStartupWithAI(item) {
   const prompt = `Startup Name: ${item.name}
-Sector: ${item.sector}
+Sector: ${item.climateSector}
 Stage: ${item.stage}
-Location: ${item.location}
-Current Traction: ${item.currentTraction}
+Headquarters: ${item.headquaters}
+Revenue / Traction: ${item.revenueLast12Months}
 Funding Ask: ${item.currentAsk}
-Description: ${item.description || "Not provided"}
+Existing tagline/description: ${item.tagline || "Not provided"}
 
 Write a compelling investor one-pager profile for this startup. Return ONLY a valid JSON object, no markdown backticks, no commentary:
 {
@@ -1536,7 +1612,14 @@ Write a compelling investor one-pager profile for this startup. Return ONLY a va
 
   const match = (data.text || "").match(/\{[\s\S]*\}/);
   if (!match) throw new Error("AI did not return usable JSON.");
-  return JSON.parse(match[0]);
+  const enriched = JSON.parse(match[0]);
+
+  // Gap-fill only — never clobber real data already present on this row.
+  const filled = {};
+  Object.keys(enriched).forEach((key) => {
+    if (!isMeaningfulExtractedValue(item[key])) filled[key] = enriched[key];
+  });
+  return filled;
 }
 
 // Processes every row with a real AI call, one at a time (bulk AI calls run
@@ -1590,32 +1673,78 @@ async function runBulkGeneratorBatch() {
   }
 }
 
-function loadBulkIntoCanvas(id) {
-  const item = bulkStartupsList.find(b => b.id === id);
+/* ---------------------------------------------------- */
+/* BULK EDIT POPUP — reuses the real editable canvas by  */
+/* physically moving its DOM node into the modal and back */
+/* ---------------------------------------------------- */
+let bulkEditingItemId = null;
+let bulkEditSavedStartupData = null;
+let bulkEditCanvasOriginalParent = null;
+let bulkEditCanvasOriginalNextSibling = null;
+
+const CANVAS_SHAPED_FIELDS = [
+  "name", "tagline", "climateSector", "subSector", "stage", "marketSize",
+  "totalFundRaised", "revenueLast12Months", "countries", "co2EmissionReduced",
+  "avgEnergySavings", "waterSaved", "uspAIUse", "targetCustomer", "businessModel",
+  "teamSize", "currentAsk", "incorporateYear", "headquaters", "website", "logo"
+];
+
+function bulkItemToStartupData(item) {
+  const data = JSON.parse(JSON.stringify(DEFAULT_STARTUP));
+  CANVAS_SHAPED_FIELDS.forEach((key) => {
+    if (isMeaningfulExtractedValue(item[key])) data[key] = item[key];
+  });
+  data.foundingTeam = item.foundingTeam && item.foundingTeam.length ? item.foundingTeam : [];
+  data.strategicPartners = item.strategicPartners && item.strategicPartners.length ? item.strategicPartners : [];
+  data.backedBy = item.backedBy && item.backedBy.length ? item.backedBy : [];
+  return data;
+}
+
+function openBulkEditModal(id) {
+  const item = bulkStartupsList.find((b) => b.id === id);
   if (!item) return;
 
-  // Map the bulk row's fields onto the actual canvas field names — these
-  // don't match 1:1 (the bulk list uses "sector"/"location", the canvas
-  // uses "climateSector"/"headquaters", etc).
-  if (isMeaningfulExtractedValue(item.name)) currentStartupData.name = item.name;
-  if (isMeaningfulExtractedValue(item.sector)) currentStartupData.climateSector = item.sector;
-  if (isMeaningfulExtractedValue(item.stage)) currentStartupData.stage = item.stage;
-  if (isMeaningfulExtractedValue(item.location)) currentStartupData.headquaters = item.location;
-  if (isMeaningfulExtractedValue(item.currentTraction)) currentStartupData.revenueLast12Months = item.currentTraction;
-  if (isMeaningfulExtractedValue(item.currentAsk)) currentStartupData.currentAsk = item.currentAsk;
-  if (isMeaningfulExtractedValue(item.logo)) currentStartupData.logo = item.logo;
+  bulkEditingItemId = id;
+  bulkEditSavedStartupData = currentStartupData;
+  currentStartupData = bulkItemToStartupData(item);
 
-  // Fields only present after "Process All with AI" has enriched this row
-  if (isMeaningfulExtractedValue(item.tagline)) currentStartupData.tagline = item.tagline;
-  if (isMeaningfulExtractedValue(item.uspAIUse)) currentStartupData.uspAIUse = item.uspAIUse;
-  else if (isMeaningfulExtractedValue(item.description)) currentStartupData.uspAIUse = item.description;
-  if (isMeaningfulExtractedValue(item.targetCustomer)) currentStartupData.targetCustomer = item.targetCustomer;
-  if (isMeaningfulExtractedValue(item.businessModel)) currentStartupData.businessModel = item.businessModel;
+  const canvasEl = document.getElementById("onePagerCanvas");
+  const host = document.getElementById("bulkEditCanvasHost");
+  bulkEditCanvasOriginalParent = canvasEl.parentElement;
+  bulkEditCanvasOriginalNextSibling = canvasEl.nextSibling;
+  host.appendChild(canvasEl);
+
+  document.getElementById("bulkEditModal").classList.remove("hidden");
+  populateFormFields();
+  updateCanvasUI();
+  if (window.lucide && typeof lucide.createIcons === "function") lucide.createIcons();
+}
+
+function closeBulkEditModal() {
+  const item = bulkStartupsList.find((b) => b.id === bulkEditingItemId);
+  if (item) {
+    CANVAS_SHAPED_FIELDS.forEach((key) => { item[key] = currentStartupData[key]; });
+    item.foundingTeam = currentStartupData.foundingTeam || [];
+    item.strategicPartners = currentStartupData.strategicPartners || [];
+    item.backedBy = currentStartupData.backedBy || [];
+  }
+
+  const canvasEl = document.getElementById("onePagerCanvas");
+  if (bulkEditCanvasOriginalNextSibling) {
+    bulkEditCanvasOriginalParent.insertBefore(canvasEl, bulkEditCanvasOriginalNextSibling);
+  } else if (bulkEditCanvasOriginalParent) {
+    bulkEditCanvasOriginalParent.appendChild(canvasEl);
+  }
+
+  document.getElementById("bulkEditModal").classList.add("hidden");
+  currentStartupData = bulkEditSavedStartupData;
+  bulkEditSavedStartupData = null;
+  bulkEditingItemId = null;
 
   populateFormFields();
   updateCanvasUI();
-  switchView("dashboard");
-  showToast(`Loaded ${item.name} into Live Editable Canvas`);
+  renderBulkGallery(currentBulkLayout);
+  showToast(item ? `Saved changes to ${item.name}` : "Closed editor");
 }
 
 function downloadSampleCSV() {
@@ -1648,22 +1777,82 @@ function findColumnValue(row, ...candidateNames) {
   return "";
 }
 
-function mapRowToBulkStartup(row, idx) {
-  const name = findColumnValue(row, "Startup Name", "Name", "Company", "Company Name") || `Startup ${idx + 1}`;
+// Best-effort company name from a logo URL when the sheet only gives a logo
+// (e.g. Clearbit-style "https://logo.clearbit.com/ibm.com" -> "Ibm") — the
+// sheet format this app expects doesn't include separate partner/backer
+// name columns, only logo URLs.
+function deriveNameFromLogoUrl(url) {
+  try {
+    const u = new URL(url);
+    const domain = u.pathname.replace(/^\//, "") || u.hostname;
+    const base = domain.split(".")[0];
+    return base ? base.charAt(0).toUpperCase() + base.slice(1) : "Partner";
+  } catch {
+    return "Partner";
+  }
+}
+
+function extractFoundersFromRow(row) {
+  const founders = [];
+  for (let n = 1; n <= 3; n++) {
+    const name = findColumnValue(row, `founder${n}Name`, `Founder ${n} Name`, `Founder${n}`);
+    if (!name) continue;
+    const title = findColumnValue(row, `founder${n}Role`, `Founder ${n} Role`, `Founder${n}Title`) || "Co-Founder";
+    const photo = findColumnValue(row, `founder${n}PhotoUrl`, `Founder ${n} Photo`) || getFounderPhotoUrl({ name }, n - 1);
+    founders.push({ name, title, photo });
+  }
+  return founders;
+}
+
+function extractLogoArrayFromRow(row, prefix, count) {
+  const list = [];
+  for (let n = 1; n <= count; n++) {
+    const logo = findColumnValue(row, `${prefix}${n}LogoUrl`, `${prefix} ${n} Logo`, `${prefix}${n} Logo Url`);
+    if (!logo) continue;
+    list.push({ name: deriveNameFromLogoUrl(logo), logo });
+  }
+  return list;
+}
+
+// Maps one spreadsheet row onto the full canvas-shaped bulk item. Column
+// names are checked against both this app's own rich schema (startupName,
+// climateSector, uspAiUsage, ...) and plainer generic names (Name, Sector,
+// USP, ...), so either a fully-detailed sheet or a bare-bones one maps
+// correctly through the same function.
+function mapExcelRowToBulkItem(row, idx) {
+  const name = findColumnValue(row, "startupName", "Startup Name", "Name", "Company", "Company Name") || `Startup ${idx + 1}`;
+
   return {
     id: `bulk-${Date.now()}-${idx}`,
-    name,
-    sector: findColumnValue(row, "Sector", "Industry") || "—",
-    stage: findColumnValue(row, "Stage", "Funding Stage") || "—",
-    location: findColumnValue(row, "Location", "Headquarters", "HQ") || "—",
-    currentTraction: findColumnValue(row, "Traction", "Current Traction") || "—",
-    currentAsk: findColumnValue(row, "Ask", "Funding Ask", "Current Ask") || "—",
-    climateMetrics: findColumnValue(row, "Climate Metrics", "Impact Metrics") || "",
     status: "Draft",
-    reviewerEmail: findColumnValue(row, "Reviewer Email", "Email", "Contact Email") || "",
-    logo: findColumnValue(row, "Logo", "Logo URL") ||
+    reviewerEmail: findColumnValue(row, "contactEmail", "Contact Email", "email", "Email", "Reviewer Email"),
+
+    name,
+    tagline: findColumnValue(row, "startupDescription", "Tagline", "Description", "Summary"),
+    climateSector: findColumnValue(row, "climateSector", "Sector", "Industry"),
+    subSector: findColumnValue(row, "subSectors", "subSector", "Sub Sector", "Sub-Sector"),
+    stage: findColumnValue(row, "stage", "Funding Stage"),
+    marketSize: findColumnValue(row, "marketSize", "Market Size", "TAM"),
+    totalFundRaised: findColumnValue(row, "totalFundingRaised", "Total Fund Raised", "Total Funding Raised", "Funding Raised"),
+    revenueLast12Months: findColumnValue(row, "revenueLast12Months", "Revenue", "Revenue Last 12 Months", "Traction", "Current Traction"),
+    countries: findColumnValue(row, "marketsOperatingIn", "Markets Operating In", "Countries", "Markets"),
+    co2EmissionReduced: findColumnValue(row, "co2EmissionsReduced", "CO2 Emission Reduced", "CO2 Emissions Reduced", "CO2 Reduced"),
+    avgEnergySavings: findColumnValue(row, "energySavings", "Energy Savings", "Avg Energy Savings"),
+    waterSaved: findColumnValue(row, "waterSaved", "Water Saved"),
+    uspAIUse: findColumnValue(row, "uspAiUsage", "USP", "USP AI Use", "USP/AI Use"),
+    targetCustomer: findColumnValue(row, "targetCustomers", "Target Customers", "Target Customer"),
+    businessModel: findColumnValue(row, "businessModel", "Business Model"),
+    teamSize: findColumnValue(row, "teamSize", "Team Size"),
+    currentAsk: findColumnValue(row, "currentAsk", "Ask", "Funding Ask", "Current Ask"),
+    incorporateYear: findColumnValue(row, "incorporationYear", "Incorporation Year", "Incorporate Year", "Founded"),
+    headquaters: findColumnValue(row, "headquarters", "Headquarters", "Location", "HQ"),
+    website: findColumnValue(row, "website", "Website"),
+    logo: findColumnValue(row, "startupLogoUrl", "Startup Logo Url", "Logo", "Logo URL") ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=ffffff&bold=true`,
-    description: findColumnValue(row, "Description", "Summary", "About") || ""
+
+    foundingTeam: extractFoundersFromRow(row),
+    strategicPartners: extractLogoArrayFromRow(row, "partner", 2),
+    backedBy: extractLogoArrayFromRow(row, "backedBy", 2)
   };
 }
 
@@ -1687,10 +1876,11 @@ async function handleBulkFileUpload(e) {
       return;
     }
 
-    bulkStartupsList = rows.map((row, idx) => mapRowToBulkStartup(row, idx));
+    bulkStartupsList = rows.map((row, idx) => mapExcelRowToBulkItem(row, idx));
+    selectedBulkIds = new Set();
     updateBulkTotalCount();
     renderBulkGallery(currentBulkLayout);
-    showToast(`Loaded ${bulkStartupsList.length} startup${bulkStartupsList.length === 1 ? "" : "s"} from "${file.name}". Click "Process All with AI" to generate one-pagers.`);
+    showToast(`Loaded ${bulkStartupsList.length} startup${bulkStartupsList.length === 1 ? "" : "s"} from "${file.name}".`);
   } catch (err) {
     console.error("Bulk file upload error:", err);
     showToast(`Couldn't read "${file.name}": ${err.message || "unknown error"}`);
@@ -1711,14 +1901,236 @@ function openReviewModal() {
   document.getElementById("reviewModal").classList.remove("hidden");
 }
 
-function openReviewModalForBulk(startupName, email) {
-  document.getElementById("emailSubject").value = `${startupName} Startup One-Pager Report for Review`;
-  document.getElementById("emailRecipient").value = email || "investor@vc-fund.com";
+let activeReviewContextName = null;
+
+function openReviewModalForBulk(id) {
+  const item = bulkStartupsList.find((b) => b.id === id);
+  if (!item) return;
+
+  activeReviewContextName = item.name;
+  document.getElementById("emailSubject").value = `${item.name} — One-Pager Ready for Your Review`;
+  document.getElementById("emailRecipient").value = item.reviewerEmail || "";
+  const missing = getMissingFieldLabels(item);
+  document.getElementById("emailBody").value = buildReviewEmailBody(item, missing);
   openReviewModal();
 }
 
 function closeReviewModal() {
   document.getElementById("reviewModal").classList.add("hidden");
+}
+
+/* ---------------------------------------------------- */
+/* BULK "SEND FOR REVIEW" — real PDF attachment + a note */
+/* about any fields the sheet didn't have data for        */
+/* ---------------------------------------------------- */
+const BULK_REQUIRED_FIELD_LABELS = {
+  climateSector: "Climate Sector", subSector: "Sub Sector", stage: "Stage",
+  marketSize: "Market Size", uspAIUse: "USP / How AI Is Used", targetCustomer: "Target Customer",
+  businessModel: "Business Model", teamSize: "Team Size", totalFundRaised: "Total Fund Raised",
+  revenueLast12Months: "Revenue (Last 12 Months)", countries: "Markets Operating In",
+  co2EmissionReduced: "CO2 Emission Reduced", avgEnergySavings: "Energy Savings", waterSaved: "Water Saved",
+  currentAsk: "Current Ask", incorporateYear: "Incorporation Year", headquaters: "Headquarters", website: "Website"
+};
+
+function getMissingFieldLabels(item) {
+  const missing = Object.entries(BULK_REQUIRED_FIELD_LABELS)
+    .filter(([key]) => !isMeaningfulExtractedValue(item[key]))
+    .map(([, label]) => label);
+  if (!item.foundingTeam || item.foundingTeam.length === 0) missing.push("Founding Team");
+  return missing;
+}
+
+// EmailJS's file-attachment feature is a paid add-on, so instead the PDF is
+// hosted briefly on our own server (see /api/store-pdf) and the email links
+// to it — no attachment, no upgrade needed, and it works in every mail client.
+function buildReviewEmailBody(item, missingLabels, pdfUrl) {
+  const greetingName = (item.foundingTeam && item.foundingTeam[0] && item.foundingTeam[0].name) || "there";
+  let body = `Hi ${greetingName},\n\nWe've prepared the investor one-pager for ${item.name}, ready for your review.\n`;
+
+  if (pdfUrl) {
+    body += `\nYou can view/download it here:\n${pdfUrl}\n`;
+  }
+
+  if (missingLabels && missingLabels.length > 0) {
+    body += `\nWhile putting this together, we noticed the following information wasn't available in our records:\n`;
+    body += missingLabels.map((l) => `- ${l}`).join("\n");
+    body += `\n\nIf you're able to share these details, we'll update the one-pager to make it complete.\n`;
+  }
+
+  body += `\nBest regards,\nPageCraft AI Team`;
+  return body;
+}
+
+// Uploads a generated PDF to our own server and returns a full, shareable
+// download URL (valid for 48 hours).
+async function uploadPdfAndGetLink(base64, filename) {
+  const res = await fetch("/api/store-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base64, filename })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to upload the PDF.");
+  return `${window.location.origin}${data.url}`;
+}
+
+// Renders the given canvas-shaped data onto the real #onePagerCanvas and
+// captures it as a one-page PDF, returned as base64 — reuses the exact same
+// html2canvas/jsPDF pipeline as the single-agent Export button, just
+// returning bytes instead of downloading.
+function generateOnePagerPdfBase64() {
+  return new Promise((resolve, reject) => {
+    const canvas = document.getElementById("onePagerCanvas");
+    if (!canvas || typeof html2canvas === "undefined" || !window.jspdf) {
+      reject(new Error("Export libraries not loaded."));
+      return;
+    }
+    html2canvas(canvas, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      windowWidth: 794,
+      windowHeight: 1123
+    }).then((cvs) => {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      const imgData = cvs.toDataURL("image/jpeg", 0.92);
+      pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+      const dataUri = pdf.output("datauristring");
+      const base64 = dataUri.split("base64,")[1] || "";
+      if (!base64) {
+        reject(new Error("PDF generation produced no data."));
+        return;
+      }
+      resolve(base64);
+    }).catch(reject);
+  });
+}
+
+async function sendReviewEmailWithPdfLink(item, pdfBase64, missingLabels) {
+  if (!item.reviewerEmail) {
+    throw new Error("No contact email on file for this startup.");
+  }
+  if (!window.emailjs || typeof emailjs.send !== "function") {
+    throw new Error("Email service failed to load.");
+  }
+
+  const pdfUrl = await uploadPdfAndGetLink(pdfBase64, `${item.name}_OnePager.pdf`);
+
+  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: item.reviewerEmail,
+    subject: `${item.name} — One-Pager Ready for Your Review`,
+    message: buildReviewEmailBody(item, missingLabels, pdfUrl),
+    name: "PageCraft AI",
+    from_name: "PageCraft AI",
+    email: item.reviewerEmail,
+    time: new Date().toLocaleString()
+  });
+}
+
+function showBulkSendOverlay(text) {
+  let overlay = document.getElementById("bulkSendOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "bulkSendOverlay";
+    overlay.className = "fixed inset-0 bg-black/85 backdrop-blur-md z-[60] flex flex-col items-center justify-center gap-4";
+    overlay.innerHTML = `
+      <i data-lucide="loader-2" class="w-8 h-8 text-indigo-400 animate-spin"></i>
+      <span id="bulkSendOverlayText" class="text-sm text-white font-semibold"></span>
+    `;
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.remove("hidden");
+  document.getElementById("bulkSendOverlayText").innerText = text;
+  if (window.lucide && typeof lucide.createIcons === "function") lucide.createIcons();
+}
+
+function updateBulkSendOverlay(text) {
+  const el = document.getElementById("bulkSendOverlayText");
+  if (el) el.innerText = text;
+}
+
+function hideBulkSendOverlay() {
+  const overlay = document.getElementById("bulkSendOverlay");
+  if (overlay) overlay.remove();
+}
+
+// The main bulk action: for every checked startup, render its real one-pager,
+// export it as a PDF, and email it to that startup's own contact address —
+// noting any fields our records were missing so they can send that data back.
+async function sendSelectedForReview() {
+  const selectedItems = bulkStartupsList.filter((i) => selectedBulkIds.has(i.id));
+  if (selectedItems.length === 0) {
+    showToast("Select at least one startup first.");
+    return;
+  }
+
+  const missingEmail = selectedItems.filter((i) => !i.reviewerEmail);
+  if (missingEmail.length > 0) {
+    showToast(`⚠️ ${missingEmail.length} selected startup(s) have no contact email — deselect or fix those first: ${missingEmail.map((i) => i.name).join(", ")}`);
+    return;
+  }
+
+  if (!confirm(`Send one-pager review emails to ${selectedItems.length} startup(s)?`)) return;
+
+  showBulkSendOverlay(`Preparing ${selectedItems.length} one-pager(s)...`);
+
+  const savedStartupData = currentStartupData;
+  const dashView = document.getElementById("mainDashboardView");
+  const bulkView = document.getElementById("bulkWorkspaceView");
+  dashView.classList.remove("hidden");
+  bulkView.classList.add("hidden");
+
+  let sent = 0;
+  let failed = 0;
+
+  for (let i = 0; i < selectedItems.length; i++) {
+    const item = selectedItems[i];
+    updateBulkSendOverlay(`Generating PDF for ${item.name} (${i + 1}/${selectedItems.length})...`);
+    try {
+      currentStartupData = bulkItemToStartupData(item);
+      updateCanvasUI();
+      await new Promise((r) => setTimeout(r, 60)); // let layout/paint settle before capture
+
+      const pdfBase64 = await generateOnePagerPdfBase64();
+      const missing = getMissingFieldLabels(item);
+
+      updateBulkSendOverlay(`Emailing ${item.name} (${i + 1}/${selectedItems.length})...`);
+      await sendReviewEmailWithPdfLink(item, pdfBase64, missing);
+
+      item.status = "Sent";
+      sent++;
+      notificationFeed.unshift({
+        id: `notif-${Date.now()}-${i}`,
+        timestamp: "Just now",
+        title: "Email Sent Successfully",
+        message: `Sent one-pager review email to ${item.reviewerEmail}${missing.length ? ` (noted ${missing.length} missing field${missing.length === 1 ? "" : "s"})` : ""}`,
+        type: "sent",
+        read: false,
+        startupName: item.name
+      });
+    } catch (err) {
+      console.error(`Failed to send review email for "${item.name}":`, err);
+      item.status = "Error";
+      failed++;
+    }
+  }
+
+  currentStartupData = savedStartupData;
+  dashView.classList.add("hidden");
+  bulkView.classList.remove("hidden");
+  updateCanvasUI();
+  hideBulkSendOverlay();
+  selectedBulkIds = new Set();
+  renderBulkGallery(currentBulkLayout);
+  if (sent > 0) renderNotifications();
+
+  if (failed === 0) {
+    showToast(`✅ Sent ${sent} one-pager review email(s)!`);
+  } else {
+    showToast(`Sent ${sent} email(s), ${failed} failed — check the console for details.`);
+  }
 }
 
 function runAIEmailAutofill() {
@@ -1785,10 +2197,11 @@ function confirmAndSendEmail() {
       message: `Sent one-pager review email to ${recipient}`,
       type: "sent",
       read: false,
-      startupName: currentStartupData.name
+      startupName: activeReviewContextName || currentStartupData.name
     };
     notificationFeed.unshift(newNotif);
     renderNotifications();
+    activeReviewContextName = null;
 
     showToast(`✅ Email sent to ${recipient}!`);
   }).catch((err) => {

@@ -1173,11 +1173,19 @@
       </div>
 
       <!-- Batch Actions -->
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center flex-wrap gap-2">
+        <label class="flex items-center space-x-1.5 text-xs text-gray-400 cursor-pointer px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+          <input type="checkbox" id="bulkSelectAllCheckbox" onchange="toggleSelectAllBulk(this.checked)" class="w-3.5 h-3.5 accent-indigo-500 cursor-pointer">
+          <span>Select All</span>
+        </label>
         <span class="text-xs text-gray-400">Total Startups: <strong id="bulkTotalCount" class="text-white">6 Records</strong></span>
         <button onclick="runBulkGeneratorBatch()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow">
           <i data-lucide="play" class="w-3.5 h-3.5"></i>
           <span>Process All with AI</span>
+        </button>
+        <button id="bulkSendSelectedBtn" onclick="sendSelectedForReview()" disabled class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center space-x-1.5 shadow">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span>Send Selected for Review (<span id="bulkSelectedCount">0</span>)</span>
         </button>
       </div>
     </div>
@@ -1277,6 +1285,25 @@
         <i data-lucide="send" class="w-3.5 h-3.5"></i>
         <span>Send</span>
       </button>
+    </div>
+  </div>
+
+  <!-- MODAL: BULK EDIT ONE-PAGER (reuses the real #onePagerCanvas via JS DOM move) -->
+  <div id="bulkEditModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div class="glass-panel w-full max-w-4xl my-8 p-4 rounded-2xl border border-white/15 shadow-2xl relative">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold font-['Outfit'] text-white flex items-center space-x-2">
+          <i data-lucide="edit-3" class="w-5 h-5 text-indigo-400"></i>
+          <span>Edit One-Pager</span>
+        </h3>
+        <button onclick="closeBulkEditModal()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg flex items-center space-x-1.5">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>Done Editing</span>
+        </button>
+      </div>
+      <div id="bulkEditCanvasHost" class="flex justify-center">
+        <!-- #onePagerCanvas gets moved in here while editing -->
+      </div>
     </div>
   </div>
 
