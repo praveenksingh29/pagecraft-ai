@@ -1,0 +1,567 @@
+/* PageCraft AI - Premium Styling System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+:root {
+  --bg-dark: #090d16;
+  --bg-card: rgba(18, 24, 38, 0.75);
+  --bg-card-hover: rgba(28, 36, 56, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(99, 102, 241, 0.4);
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-cyan: #06b6d4;
+  --accent-emerald: #10b981;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-glass: 0 20px 50px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.25);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 14, 23, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all 0.25s ease-in-out;
+}
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Glow Effects */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+}
+.glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
+}
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+}
+
+/* Linear-style Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-accent {
+  background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Editable Canvas Elements */
+.canvas-editable {
+  position: relative;
+  transition: outline 0.15s ease, background 0.15s ease;
+  border-radius: 4px;
+}
+.canvas-editable:hover {
+  outline: 2px dashed rgba(99, 102, 241, 0.6);
+  background: rgba(99, 102, 241, 0.05);
+  cursor: text;
+}
+.canvas-editable:focus {
+  outline: 2px solid #818cf8 !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Live Template Styles */
+.template-modern-saas {
+  background: linear-gradient(145deg, #0d1117 0%, #161b22 100%);
+  color: #f0f6fc;
+}
+
+.template-investor-pitch {
+  background: #090c10;
+  border-top: 4px solid #6366f1;
+  color: #ffffff;
+}
+
+.template-climate-tech {
+  background: linear-gradient(145deg, #041d14 0%, #0c2d20 100%);
+  color: #e6f4ea;
+}
+
+.template-fintech {
+  background: linear-gradient(145deg, #0b192c 0%, #1e3e62 100%);
+  color: #f1f5f9;
+}
+
+.template-healthcare {
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  border-left: 5px solid #06b6d4;
+  color: #f8fafc;
+}
+
+.template-minimal {
+  background: #ffffff;
+  color: #0f172a;
+}
+.template-minimal .text-muted-custom {
+  color: #64748b;
+}
+
+.template-premium-executive {
+  background: #0f172a;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #f8fafc;
+}
+
+/* Floating AI Widget Animation */
+@keyframes floatAnimation {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: floatAnimation 4s ease-in-out infinite;
+}
+
+/* Pulse Glow */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2.5s infinite;
+}
+
+/* Custom Tabs & Badges */
+.nav-tab-active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border-bottom: 2px solid #6366f1;
+}
+
+/* Tooltip */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]:before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 100;
+}
+[data-tooltip]:hover:before {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------- */
+/* 5 DISTINCT AI DESIGN TEMPLATE STYLES */
+/* ---------------------------------------------------- */
+
+/* Template 1: Modern SaaS (Glassmorphic) */
+.template-exec-grid {
+  border-radius: 1.25rem !important;
+}
+.template-exec-grid .glass-card {
+  border-radius: 1rem !important;
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Template 2: Minimalist Executive (Stark & Square) */
+.template-minimal-exec {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 0px !important;
+  border: 2px solid #0f172a !important;
+}
+.template-minimal-exec h1, .template-minimal-exec h2, .template-minimal-exec h3, .template-minimal-exec h4,
+.template-minimal-exec .text-white, .template-minimal-exec .text-slate-100 {
+  color: #0f172a !important;
+}
+.template-minimal-exec p, .template-minimal-exec span, .template-minimal-exec div,
+.template-minimal-exec .text-gray-400, .template-minimal-exec .text-gray-300 {
+  color: #334155 !important;
+}
+.template-minimal-exec .glass-card {
+  background: #f8fafc !important;
+  border: 2px solid #0f172a !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+}
+.template-minimal-exec .glass-card h1, .template-minimal-exec .glass-card h2, .template-minimal-exec .glass-card h3, .template-minimal-exec .glass-card h4,
+.template-minimal-exec .glass-card p, .template-minimal-exec .glass-card span, .template-minimal-exec .glass-card div {
+  color: #0f172a !important;
+}
+
+/* Template 3: Neo-Brutalist Bold (High Contrast & Hard Shadow) */
+.template-neo-brutalist {
+  background: #0f172a !important;
+  color: #fbbf24 !important;
+  border: 4px solid #fbbf24 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 8px 8px 0px 0px rgba(251, 191, 36, 1) !important;
+}
+.template-neo-brutalist .glass-card {
+  background: #1e1b4b !important;
+  border: 3px solid #fbbf24 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 5px 5px 0px 0px rgba(251, 191, 36, 0.9) !important;
+}
+.template-neo-brutalist h1, .template-neo-brutalist h2, .template-neo-brutalist h3 {
+  text-transform: uppercase !important;
+  font-weight: 900 !important;
+  color: #fbbf24 !important;
+}
+
+/* Template 4: Cybertech Futuristic (Neon Web3) */
+.template-cybertech {
+  background: var(--canvas-custom-bg, linear-gradient(135deg, #020617 0%, #1e1035 50%, #0e7490 100%));
+  color: #38bdf8 !important;
+  border: 2px solid #06b6d4 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.4) !important;
+}
+.template-cybertech .glass-card {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid #06b6d4 !important;
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.25) !important;
+}
+
+/* Template 5: Dense VC Split (3-Column Executive) */
+.template-dense-vc {
+  background: var(--canvas-custom-bg, linear-gradient(135deg, #022c22 0%, #064e3b 50%, #0f172a 100%));
+  color: #ecfdf5 !important;
+  border: 2px solid #10b981 !important;
+  border-radius: 1rem !important;
+}
+.template-dense-vc .glass-card {
+  background: rgba(6, 78, 59, 0.5) !important;
+  border: 1px solid rgba(52, 211, 153, 0.3) !important;
+}
+
+/* Template 6: Mint Impact (Light Teal/Mint — Climate & Agri Impact style) */
+/* All rules are prefixed with #onePagerCanvas so they win regardless of
+   where .theme-light-mode's rules land in the cascade (both are 2-class
+   selectors otherwise, which would tie on specificity). */
+#onePagerCanvas.template-mint-impact {
+  background: #ffffff !important;
+  border: 1px solid #cdeee0 !important;
+  border-radius: 1.25rem !important;
+}
+
+/* Header band (logo + name + tagline) becomes a solid dark-teal band */
+#onePagerCanvas.template-mint-impact > div.flex-1 > div:first-child {
+  background: #0d4f5c;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border-bottom: none !important;
+}
+#onePagerCanvas.template-mint-impact > div.flex-1 > div:first-child #canvasName,
+#onePagerCanvas.template-mint-impact > div.flex-1 > div:first-child #canvasTagline {
+  color: #ffffff !important;
+}
+
+/* Cards */
+#onePagerCanvas.template-mint-impact .glass-card {
+  background: #eef8fb !important;
+  border: 1px solid #cfeaf2 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 4px 14px rgba(15, 118, 148, 0.08) !important;
+}
+#onePagerCanvas.template-mint-impact [class*="bg-slate-900/60"],
+#onePagerCanvas.template-mint-impact [class*="bg-slate-900/80"] {
+  background: #ffffff !important;
+  border-color: #d9eff5 !important;
+}
+
+/* Strategic Partners / Backed By pill boxes */
+#onePagerCanvas.template-mint-impact .border-slate-200.bg-white {
+  background: #e3f9ee !important;
+  border-color: #b9ecd4 !important;
+}
+#onePagerCanvas.template-mint-impact .text-slate-800,
+#onePagerCanvas.template-mint-impact .text-indigo-600,
+#onePagerCanvas.template-mint-impact .text-purple-600 {
+  color: #0d4f5c !important;
+}
+
+/* Text colors — unify every accent color used across sections to one teal,
+   and body/value text to a dark teal-navy instead of generic slate */
+#onePagerCanvas.template-mint-impact .text-white {
+  color: #0a2e37 !important;
+}
+#onePagerCanvas.template-mint-impact .text-gray-400,
+#onePagerCanvas.template-mint-impact .text-gray-300,
+#onePagerCanvas.template-mint-impact .text-gray-200 {
+  color: #4b6b72 !important;
+}
+#onePagerCanvas.template-mint-impact .text-cyan-400,
+#onePagerCanvas.template-mint-impact .text-cyan-300,
+#onePagerCanvas.template-mint-impact .text-emerald-400,
+#onePagerCanvas.template-mint-impact .text-emerald-300,
+#onePagerCanvas.template-mint-impact .text-indigo-400,
+#onePagerCanvas.template-mint-impact .text-indigo-300,
+#onePagerCanvas.template-mint-impact .text-purple-400,
+#onePagerCanvas.template-mint-impact .text-purple-300,
+#onePagerCanvas.template-mint-impact .text-pink-400,
+#onePagerCanvas.template-mint-impact .text-teal-400,
+#onePagerCanvas.template-mint-impact .text-amber-400 {
+  color: #14818f !important;
+}
+
+/* Impact metric icon chips */
+#onePagerCanvas.template-mint-impact [class*="bg-indigo-500/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-emerald-500/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-purple-500/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-teal-500/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-amber-500/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-cyan-500/20"] {
+  background: #d9f2e6 !important;
+  border-color: #9fdfc0 !important;
+}
+
+/* Current Ask / Team Size pill boxes */
+#onePagerCanvas.template-mint-impact [class*="bg-indigo-950/30"],
+#onePagerCanvas.template-mint-impact [class*="bg-emerald-950/20"],
+#onePagerCanvas.template-mint-impact [class*="bg-emerald-950/10"] {
+  background: #e3f9ee !important;
+  border-color: #b9ecd4 !important;
+}
+
+/* Founding Team heading rendered as a centered pill badge */
+#onePagerCanvas.template-mint-impact h3.text-gray-300 {
+  display: flex;
+  width: fit-content;
+  margin: 0 auto 14px auto;
+  color: #0d4f5c !important;
+  background: #ffffff;
+  border: 1.5px solid #0d4f5c;
+  padding: 6px 18px;
+  border-radius: 999px;
+}
+#onePagerCanvas.template-mint-impact h3.text-gray-300 i {
+  color: #0d4f5c !important;
+}
+
+/* Founder cards: centered photo-above-name layout instead of a side-by-side row */
+#onePagerCanvas.template-mint-impact #canvasFoundersGrid .glass-card {
+  flex-direction: column;
+  text-align: center;
+  align-items: center;
+}
+#onePagerCanvas.template-mint-impact #canvasFoundersGrid .glass-card img {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+/* Footer info bar (Incorporate Year / Headquarters / Website) — solid dark teal */
+#onePagerCanvas.template-mint-impact #canvasFooterBar {
+  background: #0d4f5c !important;
+  border-color: #0d4f5c !important;
+}
+#onePagerCanvas.template-mint-impact #canvasFooterBar * {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+#onePagerCanvas.template-mint-impact #canvasFooterBar a:hover {
+  color: #a8e6cf !important;
+}
+
+/* Light Mode High-Contrast Rules */
+.theme-light-mode {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.theme-light-mode h1, .theme-light-mode h2, .theme-light-mode h3, .theme-light-mode h4,
+.theme-light-mode .text-white, .theme-light-mode .text-slate-100 {
+  color: #0f172a !important;
+}
+
+.theme-light-mode p, .theme-light-mode span, .theme-light-mode div,
+.theme-light-mode .text-gray-400, .theme-light-mode .text-gray-300, .theme-light-mode .text-gray-200 {
+  color: #334155 !important;
+}
+
+.theme-light-mode .glass-card {
+  background: rgba(241, 245, 249, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Specific Card Light Fill overrides */
+.card-light-fill {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+.card-light-fill h1, .card-light-fill h2, .card-light-fill h3, .card-light-fill h4,
+.card-light-fill .text-white, .card-light-fill .text-slate-100, .card-light-fill .canvas-editable {
+  color: #0f172a !important;
+}
+
+.card-light-fill p, .card-light-fill span, .card-light-fill div,
+.card-light-fill .text-gray-400, .card-light-fill .text-gray-300, .card-light-fill .text-gray-200 {
+  color: #334155 !important;
+}
+
+.card-light-fill .text-indigo-300, .card-light-fill .text-purple-300,
+.card-light-fill .text-cyan-400, .card-light-fill .text-cyan-300, .card-light-fill .text-emerald-400 {
+  color: #0369a1 !important;
+}
+
+/* Explicit Container Box Contrast Rules */
+.dark-box,
+.bg-indigo-600,
+.bg-indigo-950,
+.bg-purple-950,
+.bg-slate-900,
+.bg-slate-950 {
+  color: #ffffff !important;
+}
+
+.dark-box *,
+.bg-indigo-600 *,
+.bg-indigo-950 *,
+.bg-purple-950 *,
+.bg-slate-900 *,
+.bg-slate-950 * {
+  color: #ffffff !important;
+}
+
+#canvasStage,
+#canvasStageField {
+  color: #ffffff !important;
+}
+
+.light-box,
+.bg-white,
+.bg-slate-50,
+.card-light-fill {
+  color: #0f172a !important;
+}
+
+.light-box h1, .light-box h2, .light-box h3, .light-box h4, .light-box p, .light-box span,
+.bg-white h1, .bg-white h2, .bg-white h3, .bg-white h4, .bg-white p, .bg-white span,
+.bg-slate-50 h1, .bg-slate-50 h2, .bg-slate-50 h3, .bg-slate-50 h4, .bg-slate-50 p, .bg-slate-50 span {
+  color: #0f172a !important;
+}
+
+.card-light-fill svg {
+  stroke: #0369a1 !important;
+}
+
+/* ---------------------------------------------------- */
+/* STRICT A4 PORTRAIT STANDARD CANVAS SPECIFICATION (210 x 297 mm) */
+/* ---------------------------------------------------- */
+#onePagerCanvas.a4-page-standard,
+.a4-page-standard {
+  width: 100% !important;
+  max-width: 794px !important; /* 210mm at 96 DPI */
+  height: 1123px !important;
+  min-height: 1123px !important; /* 297mm at 96 DPI */
+  max-height: 1123px !important;
+  aspect-ratio: 210 / 297 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  margin: 0 auto !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+/* Media Query Print Optimization for Strict Single Page A4 */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0mm;
+  }
+  html, body {
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: hidden !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #onePagerCanvas, #onePagerCanvas * {
+    visibility: visible !important;
+  }
+  #onePagerCanvas {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 12mm 15mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
