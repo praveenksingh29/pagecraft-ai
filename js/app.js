@@ -1379,6 +1379,7 @@ function switchView(view) {
     if (bulkView) bulkView.classList.remove("hidden");
     if (tabBulk) tabBulk.className = activeViewClass;
     if (tabDash) tabDash.className = inactiveViewClass;
+    updateBulkTotalCount();
     renderBulkGallery(currentBulkLayout);
   }
 }
@@ -1400,6 +1401,13 @@ function switchBulkLayout(layout) {
   renderBulkGallery(layout);
 }
 
+function bulkStatusBadgeClass(status) {
+  if (status === "Ready") return "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+  if (status === "Generating") return "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 animate-pulse";
+  if (status === "Error") return "bg-rose-500/20 text-rose-300 border border-rose-500/30";
+  return "bg-amber-500/20 text-amber-300 border border-amber-500/30";
+}
+
 function renderBulkGallery(layout) {
   const container = document.getElementById("bulkGalleryContainer");
   if (!container) return;
@@ -1411,7 +1419,7 @@ function renderBulkGallery(layout) {
         <div>
           <div class="flex items-center justify-between mb-3">
             <img src="${item.logo}" class="w-10 h-10 rounded-lg object-cover border border-white/10">
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${item.status === 'Ready' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${bulkStatusBadgeClass(item.status)}">
               ${item.status}
             </span>
           </div>
@@ -1488,45 +1496,112 @@ function renderBulkGallery(layout) {
   lucide.createIcons();
 }
 
-function runBulkGeneratorBatch() {
+// Asks the AI to turn one bulk row's raw facts into proper one-pager copy.
+async function generateBulkStartupWithAI(item) {
+  const prompt = `Startup Name: ${item.name}
+Sector: ${item.sector}
+Stage: ${item.stage}
+Location: ${item.location}
+Current Traction: ${item.currentTraction}
+Funding Ask: ${item.currentAsk}
+Description: ${item.description || "Not provided"}
+
+Write a compelling investor one-pager profile for this startup. Return ONLY a valid JSON object, no markdown backticks, no commentary:
+{
+  "tagline": "punchy one-line tagline (under 12 words)",
+  "uspAIUse": "2-3 sentence USP and how technology/AI is used in the product",
+  "targetCustomer": "who the ideal customer is, one sentence",
+  "businessModel": "the revenue/business model, one sentence"
+}`;
+
+  const res = await fetch("/api/ai/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt,
+      systemInstruction: "You are a startup pitch copywriter. Return ONLY valid JSON matching the requested structure, nothing else."
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "AI generation failed.");
+
+  const match = (data.text || "").match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("AI did not return usable JSON.");
+  return JSON.parse(match[0]);
+}
+
+// Processes every row with a real AI call, one at a time (bulk AI calls run
+// sequentially rather than in parallel to stay under provider rate limits),
+// updating each card's status and the progress bar as real results land —
+// no fake timer, no simulated progress.
+async function runBulkGeneratorBatch() {
+  if (bulkStartupsList.length === 0) {
+    showToast("No startups to process — upload a spreadsheet first.");
+    return;
+  }
+
   const container = document.getElementById("bulkProgressBarContainer");
   const bar = document.getElementById("bulkProgressBar");
   const text = document.getElementById("bulkProgressText");
+  const total = bulkStartupsList.length;
 
   container.classList.remove("hidden");
   bar.style.width = "0%";
-  let done = 0;
+  text.innerText = `0 of ${total} completed`;
 
-  const interval = setInterval(() => {
-    done++;
-    const pct = Math.round((done / bulkStartupsList.length) * 100);
-    bar.style.width = `${pct}%`;
-    text.innerText = `${done} of ${bulkStartupsList.length} completed`;
+  let succeeded = 0;
 
-    if (done >= bulkStartupsList.length) {
-      clearInterval(interval);
-      setTimeout(() => {
-        container.classList.add("hidden");
-        bulkStartupsList.forEach(item => item.status = "Ready");
-        renderBulkGallery(currentBulkLayout);
-        showToast("Successfully generated all 6 One-Pager reports in bulk!");
-      }, 500);
+  for (let i = 0; i < total; i++) {
+    const item = bulkStartupsList[i];
+    item.status = "Generating";
+    renderBulkGallery(currentBulkLayout);
+
+    try {
+      const enriched = await generateBulkStartupWithAI(item);
+      Object.assign(item, enriched);
+      item.status = "Ready";
+      succeeded++;
+    } catch (err) {
+      console.warn(`Bulk AI generation failed for "${item.name}":`, err);
+      item.status = "Error";
     }
-  }, 400);
+
+    const done = i + 1;
+    bar.style.width = `${Math.round((done / total) * 100)}%`;
+    text.innerText = `${done} of ${total} completed`;
+    renderBulkGallery(currentBulkLayout);
+  }
+
+  setTimeout(() => container.classList.add("hidden"), 800);
+
+  if (succeeded === total) {
+    showToast(`✨ Successfully generated all ${total} one-pagers with AI!`);
+  } else {
+    showToast(`AI generation finished — ${succeeded} of ${total} succeeded. Failed ones are marked "Error" and can be retried.`);
+  }
 }
 
 function loadBulkIntoCanvas(id) {
   const item = bulkStartupsList.find(b => b.id === id);
   if (!item) return;
 
-  currentStartupData.name = item.name;
-  currentStartupData.sector = item.sector;
-  currentStartupData.stage = item.stage;
-  currentStartupData.location = item.location;
-  currentStartupData.currentTraction = item.currentTraction;
-  currentStartupData.currentAsk = item.currentAsk;
-  currentStartupData.logo = item.logo;
-  currentStartupData.description = item.description;
+  // Map the bulk row's fields onto the actual canvas field names — these
+  // don't match 1:1 (the bulk list uses "sector"/"location", the canvas
+  // uses "climateSector"/"headquaters", etc).
+  if (isMeaningfulExtractedValue(item.name)) currentStartupData.name = item.name;
+  if (isMeaningfulExtractedValue(item.sector)) currentStartupData.climateSector = item.sector;
+  if (isMeaningfulExtractedValue(item.stage)) currentStartupData.stage = item.stage;
+  if (isMeaningfulExtractedValue(item.location)) currentStartupData.headquaters = item.location;
+  if (isMeaningfulExtractedValue(item.currentTraction)) currentStartupData.revenueLast12Months = item.currentTraction;
+  if (isMeaningfulExtractedValue(item.currentAsk)) currentStartupData.currentAsk = item.currentAsk;
+  if (isMeaningfulExtractedValue(item.logo)) currentStartupData.logo = item.logo;
+
+  // Fields only present after "Process All with AI" has enriched this row
+  if (isMeaningfulExtractedValue(item.tagline)) currentStartupData.tagline = item.tagline;
+  if (isMeaningfulExtractedValue(item.uspAIUse)) currentStartupData.uspAIUse = item.uspAIUse;
+  else if (isMeaningfulExtractedValue(item.description)) currentStartupData.uspAIUse = item.description;
+  if (isMeaningfulExtractedValue(item.targetCustomer)) currentStartupData.targetCustomer = item.targetCustomer;
+  if (isMeaningfulExtractedValue(item.businessModel)) currentStartupData.businessModel = item.businessModel;
 
   populateFormFields();
   updateCanvasUI();
@@ -1535,10 +1610,14 @@ function loadBulkIntoCanvas(id) {
 }
 
 function downloadSampleCSV() {
-  const csvContent = `data:text/csv;charset=utf-8,Startup Name,Sector,Stage,Traction,Ask,Location,Reviewer Email\nEcoGrid Solutions,Climate Tech,Seed,$420k ARR,$2.5M,Austin TX,partner@climatefund.vc\nHealthPulse AI,Healthcare,Pre-Seed,3 Clinical Trials,$1.8M,Boston MA,invest@biotechventures.com\nPayStride,FinTech,Series A,$3.2M ARR,$8.0M,New York NY,alex@nycapital.io`;
-  const encodedUri = encodeURI(csvContent);
+  const header = "Startup Name,Sector,Stage,Location,Traction,Ask,Reviewer Email,Description";
+  const rows = SAMPLE_BULK_STARTUPS.map((s) => [
+    s.name, s.sector, s.stage, s.location, s.currentTraction, s.currentAsk, s.reviewerEmail, s.description
+  ].map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+
+  const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(`${header}\n${rows}`);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
+  link.setAttribute("href", csvContent);
   link.setAttribute("download", "PageCraft_Bulk_Startups_Sample.csv");
   document.body.appendChild(link);
   link.click();
@@ -1546,12 +1625,74 @@ function downloadSampleCSV() {
   showToast("Downloaded sample startup CSV template!");
 }
 
-function handleBulkFileUpload(e) {
-  const file = e.target.files[0];
-  if (file) {
-    showToast(`Uploaded ${file.name}. Auto-mapping columns...`);
-    runBulkGeneratorBatch();
+// Case/spacing-insensitive lookup so "Startup Name", "startup_name", "Name",
+// "Company" etc. all resolve to the same field regardless of how the user
+// titled their spreadsheet columns.
+function findColumnValue(row, ...candidateNames) {
+  const normalize = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const rowKeys = Object.keys(row);
+  for (const candidate of candidateNames) {
+    const target = normalize(candidate);
+    const match = rowKeys.find((k) => normalize(k) === target);
+    if (match && String(row[match]).trim()) return String(row[match]).trim();
   }
+  return "";
+}
+
+function mapRowToBulkStartup(row, idx) {
+  const name = findColumnValue(row, "Startup Name", "Name", "Company", "Company Name") || `Startup ${idx + 1}`;
+  return {
+    id: `bulk-${Date.now()}-${idx}`,
+    name,
+    sector: findColumnValue(row, "Sector", "Industry") || "—",
+    stage: findColumnValue(row, "Stage", "Funding Stage") || "—",
+    location: findColumnValue(row, "Location", "Headquarters", "HQ") || "—",
+    currentTraction: findColumnValue(row, "Traction", "Current Traction") || "—",
+    currentAsk: findColumnValue(row, "Ask", "Funding Ask", "Current Ask") || "—",
+    climateMetrics: findColumnValue(row, "Climate Metrics", "Impact Metrics") || "",
+    status: "Draft",
+    reviewerEmail: findColumnValue(row, "Reviewer Email", "Email", "Contact Email") || "",
+    logo: findColumnValue(row, "Logo", "Logo URL") ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=ffffff&bold=true`,
+    description: findColumnValue(row, "Description", "Summary", "About") || ""
+  };
+}
+
+async function handleBulkFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  showToast(`Reading "${file.name}"...`);
+
+  try {
+    if (typeof XLSX === "undefined") {
+      throw new Error("Spreadsheet reader failed to load. Check your connection and try again.");
+    }
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+    if (rows.length === 0) {
+      showToast(`"${file.name}" has no data rows. Check the file and try again.`);
+      return;
+    }
+
+    bulkStartupsList = rows.map((row, idx) => mapRowToBulkStartup(row, idx));
+    updateBulkTotalCount();
+    renderBulkGallery(currentBulkLayout);
+    showToast(`Loaded ${bulkStartupsList.length} startup${bulkStartupsList.length === 1 ? "" : "s"} from "${file.name}". Click "Process All with AI" to generate one-pagers.`);
+  } catch (err) {
+    console.error("Bulk file upload error:", err);
+    showToast(`Couldn't read "${file.name}": ${err.message || "unknown error"}`);
+  } finally {
+    e.target.value = "";
+  }
+}
+
+function updateBulkTotalCount() {
+  const el = document.getElementById("bulkTotalCount");
+  if (el) el.innerText = `${bulkStartupsList.length} Record${bulkStartupsList.length === 1 ? "" : "s"}`;
 }
 
 /* ---------------------------------------------------- */
