@@ -1,3 +1,12 @@
+// EMAIL SENDING (EmailJS — public key, safe to ship client-side by design)
+const EMAILJS_SERVICE_ID = "service_gnt5dm3";
+const EMAILJS_TEMPLATE_ID = "template_o7kvnwa";
+const EMAILJS_PUBLIC_KEY = "zmcBH6ScmJWIKnYsN";
+
+if (window.emailjs && typeof emailjs.init === "function") {
+  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+}
+
 // GLOBAL APPLICATION STATE
 let currentStartupData = JSON.parse(JSON.stringify(DEFAULT_STARTUP));
 let currentTemplateId = "exec-grid";
@@ -1734,29 +1743,63 @@ PageCraft AI Review Automation Agent`;
 }
 
 function confirmAndSendEmail() {
-  const recipient = document.getElementById("emailRecipient").value;
-  const subject = document.getElementById("emailSubject").value;
+  const recipient = document.getElementById("emailRecipient").value.trim();
+  const subject = document.getElementById("emailSubject").value.trim();
+  const body = document.getElementById("emailBody").value;
+
+  if (!recipient) {
+    showToast("Please enter a recipient email address.");
+    return;
+  }
 
   if (!confirm(`Are you sure you want to send this startup one-pager to ${recipient}?`)) {
     return;
   }
 
-  closeReviewModal();
+  if (!window.emailjs || typeof emailjs.send !== "function") {
+    showToast("⚠️ Email service failed to load — check your connection and try again.");
+    return;
+  }
 
-  // Add to Notification Feed
-  const newNotif = {
-    id: `notif-${Date.now()}`,
-    timestamp: "Just now",
-    title: "Email Sent Successfully",
-    message: `Sent one-pager review email to ${recipient}`,
-    type: "sent",
-    read: false,
-    startupName: currentStartupData.name
-  };
-  notificationFeed.unshift(newNotif);
-  renderNotifications();
+  const sendBtn = document.querySelector('#reviewModal button[onclick="confirmAndSendEmail()"]');
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.classList.add("opacity-50", "cursor-not-allowed");
+  }
 
-  showToast(`Email dispatched to ${recipient}! Activity recorded.`);
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: recipient,
+    subject,
+    message: body,
+    name: "PageCraft AI",
+    from_name: "PageCraft AI",
+    email: recipient,
+    time: new Date().toLocaleString()
+  }).then(() => {
+    closeReviewModal();
+
+    const newNotif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Email Sent Successfully",
+      message: `Sent one-pager review email to ${recipient}`,
+      type: "sent",
+      read: false,
+      startupName: currentStartupData.name
+    };
+    notificationFeed.unshift(newNotif);
+    renderNotifications();
+
+    showToast(`✅ Email sent to ${recipient}!`);
+  }).catch((err) => {
+    console.error("EmailJS send error:", err);
+    showToast(`⚠️ Couldn't send email: ${err?.text || err?.message || "unknown error"}`);
+  }).finally(() => {
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+  });
 }
 
 /* ---------------------------------------------------- */
