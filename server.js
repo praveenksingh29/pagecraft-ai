@@ -681,7 +681,13 @@ app.get("/api/proxy-image", async (req, res) => {
     const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PageCraftAI/1.0)" }
+      headers: {
+        // A generic/bot-labeled UA gets 400/403'd by some hosts (Wikimedia
+        // among them); a realistic browser UA is accepted by the widest
+        // range of sites people paste photo links from.
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+      }
     });
     clearTimeout(timeout);
 
