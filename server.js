@@ -663,6 +663,44 @@ app.get("/api/pdf/:id", (req, res) => {
   res.send(entry.buffer);
 });
 
+// Fetches an external image server-side and streams the bytes back same-origin.
+// html2canvas can only read pixels from an image if it was loaded with CORS
+// permission, and most external hosts (founder photos pasted from LinkedIn,
+// Google Drive, ui-avatars.com, a company's own site, etc.) don't send the
+// right headers for that -- the image still displays fine on screen, it just
+// comes out blank in the exported PDF. Proxying it through our own origin
+// sidesteps that entirely.
+app.get("/api/proxy-image", async (req, res) => {
+  const { url } = req.query;
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return res.status(400).json({ error: "Missing or invalid 'url' query parameter." });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PageCraftAI/1.0)" }
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return res.status(502).json({ error: `Source returned ${response.status}` });
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) {
+      return res.status(415).json({ error: "URL did not return an image." });
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(buffer);
+  } catch (err) {
+    res.status(502).json({ error: `Failed to fetch image: ${err.message}` });
+  }
+});
+
 // Single-page app fallback (keeps deep-link-style reloads working)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));

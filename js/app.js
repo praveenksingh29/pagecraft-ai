@@ -1994,6 +1994,36 @@ function waitForImagesToLoad(container, timeoutMs = 4000) {
   return Promise.race([Promise.all(loadPromises), timeout]);
 }
 
+// Swaps every <img src> in a container for a same-origin data: URI fetched
+// through /api/proxy-image. html2canvas can only read pixels from an image
+// that was loaded with CORS permission, and most external photo hosts
+// (LinkedIn, Google Drive, ui-avatars.com, a startup's own website) don't
+// send the right headers for that — the photo displays fine on screen but
+// comes out blank in the export. A same-origin data: URI has no such
+// restriction, so this makes every photo capture-safe regardless of source.
+function inlineImagesAsDataUris(container) {
+  const imgs = Array.from(container.querySelectorAll("img"));
+  return Promise.all(imgs.map(async (img) => {
+    const src = img.getAttribute("src");
+    if (!src || src.startsWith("data:")) return;
+    try {
+      const resp = await fetch(`/api/proxy-image?url=${encodeURIComponent(src)}`);
+      if (!resp.ok) return; // leave original src — its onerror fallback (if any) still applies
+      const blob = await resp.blob();
+      const dataUri = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      img.src = dataUri;
+    } catch {
+      // network hiccup or blocked source — leave the original src so at
+      // worst that one photo is missing, rather than failing the export
+    }
+  }));
+}
+
 // Clones #onePagerCanvas into an off-screen container fixed at its true
 // design size (794x1123, the A4 page at 96 DPI) and captures THAT with
 // html2canvas, instead of capturing the live element in place. Capturing
@@ -2055,7 +2085,8 @@ function captureOnePagerCanvas(scale) {
     // clipped by the card's box even though nothing actually overflows.
     const fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
 
-    Promise.all([waitForImagesToLoad(clone), fontsReady])
+    inlineImagesAsDataUris(clone)
+      .then(() => Promise.all([waitForImagesToLoad(clone), fontsReady]))
       .then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
       .then(() => html2canvas(clone, {
         scale: scale || 2,
