@@ -1994,36 +1994,98 @@ function waitForImagesToLoad(container, timeoutMs = 4000) {
   return Promise.race([Promise.all(loadPromises), timeout]);
 }
 
-// captures it as a one-page PDF, returned as base64 — reuses the exact same
-// html2canvas/jsPDF pipeline as the single-agent Export button, just
-// returning bytes instead of downloading.
-function generateOnePagerPdfBase64() {
+// Clones #onePagerCanvas into an off-screen container fixed at its true
+// design size (794x1123, the A4 page at 96 DPI) and captures THAT with
+// html2canvas, instead of capturing the live element in place. Capturing
+// the live element directly is unreliable: the customization side panel
+// can squeeze it narrower than 794px (stretching/cropping content in the
+// export), and during the bulk-send view swap it can even be display:none
+// (0x0, blank export). The clone always lays out at full, correct size.
+// It also gets an explicit background color, because several templates
+// (e.g. the glassmorphic "Modern SaaS" grid) have no background of their
+// own on #onePagerCanvas — on screen the dark app background shows through
+// from behind it, but html2canvas only captures the element itself, so a
+// transparent capture turns solid white once flattened to JPEG.
+function captureOnePagerCanvas(scale) {
   return new Promise((resolve, reject) => {
-    const canvas = document.getElementById("onePagerCanvas");
-    if (!canvas || typeof html2canvas === "undefined" || !window.jspdf) {
+    const original = document.getElementById("onePagerCanvas");
+    if (!original || typeof html2canvas === "undefined") {
       reject(new Error("Export libraries not loaded."));
       return;
     }
-    html2canvas(canvas, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      windowWidth: 794,
-      windowHeight: 1123
-    }).then((cvs) => {
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-      const imgData = cvs.toDataURL("image/jpeg", 0.92);
-      pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
-      const dataUri = pdf.output("datauristring");
-      const base64 = dataUri.split("base64,")[1] || "";
-      if (!base64) {
-        reject(new Error("PDF generation produced no data."));
-        return;
-      }
-      resolve(base64);
-    }).catch(reject);
+
+    const liveBg = getComputedStyle(original).backgroundColor;
+    const appBg = getComputedStyle(document.body).backgroundColor;
+    const isTransparent = !liveBg || liveBg === "rgba(0, 0, 0, 0)" || liveBg === "transparent";
+    const isAppBgOpaque = appBg && appBg !== "rgba(0, 0, 0, 0)" && appBg !== "transparent";
+    const fallbackBg = isTransparent ? (isAppBgOpaque ? appBg : "#090d16") : liveBg;
+
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "position:fixed; top:0; left:-99999px; width:794px; height:1123px; overflow:hidden; z-index:-1; margin:0; padding:0;";
+
+    const clone = original.cloneNode(true);
+    clone.style.setProperty("width", "794px", "important");
+    clone.style.setProperty("max-width", "794px", "important");
+    clone.style.setProperty("height", "1123px", "important");
+    clone.style.setProperty("min-height", "1123px", "important");
+    clone.style.margin = "0";
+
+    // html2canvas doesn't reliably render `text-overflow: ellipsis` — it's a
+    // known limitation where it clips the text raggedly mid-glyph with no
+    // "..." instead of truncating cleanly. Since this export exists to show
+    // a startup's real figures, let anything using Tailwind's .truncate
+    // (nowrap + ellipsis) wrap onto extra lines in the capture instead of
+    // losing part of the value.
+    clone.querySelectorAll(".truncate").forEach((el) => {
+      el.style.setProperty("white-space", "normal", "important");
+      el.style.setProperty("overflow", "visible", "important");
+      el.style.setProperty("text-overflow", "clip", "important");
+      el.style.setProperty("word-break", "break-word", "important");
+    });
+
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+
+    const cleanup = () => { if (wrapper.parentNode) document.body.removeChild(wrapper); };
+
+    // Also wait for web fonts (e.g. Plus Jakarta Sans) to finish loading —
+    // if html2canvas snapshots text before its real font is ready, it uses
+    // fallback-font metrics with different line-height, so wrapped values
+    // (like a 2-line impact-metric figure) render with the second line
+    // clipped by the card's box even though nothing actually overflows.
+    const fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+
+    Promise.all([waitForImagesToLoad(clone), fontsReady])
+      .then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      .then(() => html2canvas(clone, {
+        scale: scale || 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: fallbackBg,
+        width: 794,
+        height: 1123,
+        windowWidth: 794,
+        windowHeight: 1123
+      }))
+      .then((cvs) => { cleanup(); resolve(cvs); })
+      .catch((err) => { cleanup(); reject(err); });
+  });
+}
+
+// Generates the one-page PDF as base64 — used by the bulk "Send for Review"
+// flow, which needs raw bytes to upload rather than a browser download.
+function generateOnePagerPdfBase64() {
+  return captureOnePagerCanvas(2).then((cvs) => {
+    if (!window.jspdf) throw new Error("Export libraries not loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const imgData = cvs.toDataURL("image/jpeg", 0.92);
+    pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+    const dataUri = pdf.output("datauristring");
+    const base64 = dataUri.split("base64,")[1] || "";
+    if (!base64) throw new Error("PDF generation produced no data.");
+    return base64;
   });
 }
 
@@ -2120,15 +2182,10 @@ async function sendSelectedForReview() {
     try {
       currentStartupData = bulkItemToStartupData(item);
       updateCanvasUI();
-
-      // Let the browser actually paint the new content (two animation frames),
-      // then wait for every logo/photo in the canvas to finish loading before
-      // capturing — otherwise html2canvas grabs a still-blank page and the
-      // resulting PDF opens white.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const canvasEl = document.getElementById("onePagerCanvas");
-      if (canvasEl) await waitForImagesToLoad(canvasEl);
-      await new Promise((r) => setTimeout(r, 300)); // clear any CSS transitions
+      // A single frame so updateCanvasUI()'s DOM writes are committed before
+      // we clone the element for capture (captureOnePagerCanvas handles its
+      // own image-load/layout waits on the clone itself).
+      await new Promise((r) => requestAnimationFrame(r));
 
       const pdfBase64 = await generateOnePagerPdfBase64();
       const missing = getMissingFieldLabels(item);
@@ -3350,14 +3407,7 @@ function exportReport(format) {
     window.print();
   } else if (format === 'png' || format === 'pdf') {
     // Render at 3x scale for crisp 300 DPI A4 print standard
-    html2canvas(canvas, {
-      scale: 3.125,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      windowWidth: 794,
-      windowHeight: 1123
-    }).then(cvs => {
+    captureOnePagerCanvas(3.125).then(cvs => {
       if (format === 'png') {
         const link = document.createElement("a");
         link.download = `${currentStartupData.name}_OnePager_A4.png`;
