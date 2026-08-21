@@ -998,7 +998,7 @@ const STARTUP_FIELD_LABELS = {
   revenueLast12Months: "Revenue (Last 12M)", countries: "Countries", co2EmissionReduced: "CO2 Reduced",
   avgEnergySavings: "Energy Saved", waterSaved: "Water Saved", uspAIUse: "USP / AI Use",
   targetCustomer: "Target Customer", businessModel: "Business Model", teamSize: "Team Size",
-  currentAsk: "Current Ask", incorporateYear: "Incorporate Year", headquaters: "Headquarters",
+  currentAsk: "Current Ask", incorporateYear: "Incorporation Year", headquaters: "Headquarters",
   website: "Website", foundingTeam: "Founding Team"
 };
 
@@ -1040,7 +1040,7 @@ Only include a key if the source actually states or clearly implies that value. 
   "businessModel": "Revenue & Business model",
   "teamSize": "Team size / employee count",
   "currentAsk": "Current funding ask",
-  "incorporateYear": "Incorporate year",
+  "incorporateYear": "Incorporation year",
   "headquaters": "Headquarters city & country",
   "website": "Company website",
   "foundingTeam": [
