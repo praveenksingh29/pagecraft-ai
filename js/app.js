@@ -3278,7 +3278,6 @@ function checkAuthState() {
           <div class="flex items-center space-x-2 bg-white/5 px-2.5 py-1 rounded-xl border border-white/10">
             <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" class="w-6 h-6 rounded-full border border-indigo-400">
             <span class="text-xs font-semibold text-gray-200 hidden sm:inline">Alex Vance</span>
-            <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">VC Partner</span>
             <button type="button" onclick="handleSignOut()" data-tooltip="Sign Out" class="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-rose-400 transition-all ml-1 cursor-pointer">
               <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             </button>
