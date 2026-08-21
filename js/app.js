@@ -2096,10 +2096,20 @@ async function sendSelectedForReview() {
   showBulkSendOverlay(`Preparing ${selectedItems.length} one-pager(s)...`);
 
   const savedStartupData = currentStartupData;
+  const savedView = currentView;
   const dashView = document.getElementById("mainDashboardView");
   const bulkView = document.getElementById("bulkWorkspaceView");
+
+  // checkAuthState()/switchView() set an inline style.display on these views
+  // (not just the "hidden" class) based on currentView. If we only touch the
+  // class here, that inline style keeps forcing display:none — the canvas
+  // stays 0x0 and html2canvas captures a blank page no matter how long we
+  // wait. So flip currentView too and set style.display directly.
+  currentView = "dashboard";
   dashView.classList.remove("hidden");
+  dashView.style.display = "flex";
   bulkView.classList.add("hidden");
+  bulkView.style.display = "none";
 
   let sent = 0;
   let failed = 0;
@@ -2145,8 +2155,11 @@ async function sendSelectedForReview() {
   }
 
   currentStartupData = savedStartupData;
+  currentView = savedView;
   dashView.classList.add("hidden");
+  dashView.style.display = "none";
   bulkView.classList.remove("hidden");
+  bulkView.style.display = "block";
   updateCanvasUI();
   hideBulkSendOverlay();
   selectedBulkIds = new Set();
